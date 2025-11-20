@@ -149,15 +149,13 @@ if __name__ == '__main__':
     for mode in modes:
         print("\n" + "=" * 30)
         print(f"Workload mode: {mode}")
-        print("=" * 30)
-
         batch_sizes = make_batch_sizes(M, E, mode=mode, device='cpu')
         print(f"Statistics: min={int(batch_sizes.min())}, "
             f"max={int(batch_sizes.max())}, "
             f"mean={batch_sizes.float().mean().item():.1f}, "
             f"var={batch_sizes.float().var(unbiased=False).item():.1f}"
         )
-        print("-" * 30)
+        print("=" * 30)
 
         x.grad = None
         w.grad = None
