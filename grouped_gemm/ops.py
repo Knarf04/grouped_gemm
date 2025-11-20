@@ -62,13 +62,13 @@ class GroupedGemm_cuBLAS(torch.autograd.Function):
 def gmm_cuBLAS(a, b, batch_sizes, trans_b=False):
     return GroupedGemm_cuBLAS.apply(a, b, batch_sizes, trans_b)
 
-class GroupedGemm_CUTLASS(torch.autograd.Function):
+class GroupedGemm_CUTLASS_sm80(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, a, b, batch_sizes, trans_b):
         ctx.save_for_backward(a, b, batch_sizes)
         ctx.trans_b = trans_b
-        return backend.gmm_CUTLASS(a, b, batch_sizes, trans_a=False, trans_b=trans_b)
+        return backend.gmm_CUTLASS_sm80(a, b, batch_sizes, trans_a=False, trans_b=trans_b)
 
     @staticmethod
     def backward(ctx, grad):
@@ -78,16 +78,16 @@ class GroupedGemm_CUTLASS(torch.autograd.Function):
 
         agrad = None
         if ctx.needs_input_grad[0]:
-            agrad = backend.gmm_CUTLASS(
+            agrad = backend.gmm_CUTLASS_sm80(
                 grad, b, batch_sizes, trans_a=False, trans_b=not trans_b)
 
         bgrad = None
         if ctx.needs_input_grad[1]:
             lhs, rhs = (grad, a) if trans_b else (a, grad)
-            bgrad = backend.gmm_CUTLASS(
+            bgrad = backend.gmm_CUTLASS_sm80(
                 lhs, rhs, batch_sizes, trans_a=True, trans_b=False)
         return agrad, bgrad, None, None
 
 
-def gmm_CUTLASS(a, b, batch_sizes, trans_b=False):
-    return GroupedGemm_CUTLASS.apply(a, b, batch_sizes, trans_b)
+def gmm_CUTLASS_sm80(a, b, batch_sizes, trans_b=False):
+    return GroupedGemm_CUTLASS_sm80.apply(a, b, batch_sizes, trans_b)

@@ -177,8 +177,8 @@ if __name__ == '__main__':
         print("-" * 30)
 
         time_cublas, tflops_cublas = benchmark(
-            "CUTLASS", 
-            gg.ops.gmm_CUTLASS, 
+            "CUTLASS sm80", 
+            gg.ops.gmm_CUTLASS_sm80, 
             x, w, batch_sizes
         )
 

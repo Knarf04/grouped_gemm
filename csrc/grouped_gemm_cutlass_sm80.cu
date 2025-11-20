@@ -374,7 +374,7 @@ torch::Tensor CutlassGroupedGemm(torch::Tensor a,
 // assumed to be batched with fixed sized batches.
 //
 // TODO(tgale): Validate alignment is true for every batch element.
-void GroupedGemm_CUTLASS(torch::Tensor a,
+void GroupedGemm_CUTLASS_sm80(torch::Tensor a,
 		 torch::Tensor b,
 		 torch::Tensor c,
 		 torch::Tensor batch_sizes,
