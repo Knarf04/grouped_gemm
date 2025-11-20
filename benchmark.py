@@ -1,7 +1,7 @@
 import torch
 import grouped_gemm as gg
 
-def benchmark_func(name, func, x, w, batch_sizes, iterations=50):
+def benchmark(name, func, x, w, batch_sizes, iterations=50):
     print(f"Preparing {name}...")
 
     for _ in range(10):
@@ -27,6 +27,7 @@ def benchmark_func(name, func, x, w, batch_sizes, iterations=50):
     
     print(f"  -> Total GPU time: {total_ms:.2f} ms")
     print(f"  -> Time per step:  {avg_ms:.3f} ms")
+    prof.export_chrome_trace(f'{name}_trace.json')
     return avg_ms
 
 if __name__ == '__main__':
@@ -63,7 +64,7 @@ if __name__ == '__main__':
     w = torch.rand(E, N, K, dtype=torch.bfloat16, device='cuda', requires_grad=True)
     batch_sizes = torch.tensor([M//E]*E, device='cpu')
 
-    time_base = benchmark_func(
+    time_base = benchmark(
         "Base (Loop)", 
         gg.ops.gmm_base, 
         x, w, batch_sizes
@@ -72,7 +73,7 @@ if __name__ == '__main__':
     print("-" * 30)
 
     # 2. cuBLAS (Batched)
-    time_cublas = benchmark_func(
+    time_cublas = benchmark(
         "cuBLAS (Batched)", 
         gg.ops.gmm_cuBLAS, 
         x, w, batch_sizes
