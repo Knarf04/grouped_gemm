@@ -322,7 +322,7 @@ void RemoveK0Problems(int num_experts, const Args& arguments) {
 }
 
 template <bool trans_a, bool trans_b>
-torch::Tensor CutlassGroupedGemm(torch::Tensor a,
+torch::Tensor CutlassGroupedGemm_1(torch::Tensor a,
 				 torch::Tensor b,
 				 torch::Tensor c,
 				 torch::Tensor batch_sizes,
@@ -370,7 +370,7 @@ torch::Tensor CutlassGroupedGemm(torch::Tensor a,
   return c;
 }
 
-void CublasGemm(c10::BFloat16 *a, int64_t a_rows, int64_t a_cols, bool trans_a,
+void CublasGemm_1(c10::BFloat16 *a, int64_t a_rows, int64_t a_cols, bool trans_a,
 		c10::BFloat16 *b, int64_t b_rows, int64_t b_cols, bool trans_b,
 		c10::BFloat16 *c, int64_t c_rows, int64_t c_cols) {
   int m = trans_b ? b_rows : b_cols;
@@ -393,7 +393,7 @@ void CublasGemm(c10::BFloat16 *a, int64_t a_rows, int64_t a_cols, bool trans_a,
 			   CUBLAS_GEMM_DEFAULT));
 }
 
-void CublasGroupedGemm(torch::Tensor a,
+void CublasGroupedGemm_1(torch::Tensor a,
 		       torch::Tensor b,
 		       torch::Tensor c,
 		       torch::Tensor batch_sizes,
@@ -406,7 +406,7 @@ void CublasGroupedGemm(torch::Tensor a,
   c10::BFloat16* c_ptr = c.data_ptr<c10::BFloat16>();
   for (int i = 0; i < bs; ++i) {
     int64_t m = batch_sizes.data_ptr<int64_t>()[i];
-    CublasGemm(a_ptr, m, k, /*trans_a=*/false,
+    CublasGemm_1(a_ptr, m, k, /*trans_a=*/false,
 	       b_ptr, b_rows, b_cols, trans_b,
 	       c_ptr, m, n);
     a_ptr += m * k;
@@ -415,7 +415,7 @@ void CublasGroupedGemm(torch::Tensor a,
   }
 }
 
-void CublasGroupedGemmVariableK(torch::Tensor a,
+void CublasGroupedGemmVariableK_1(torch::Tensor a,
 				torch::Tensor b,
 				torch::Tensor c,
 				torch::Tensor batch_sizes) {
@@ -425,7 +425,7 @@ void CublasGroupedGemmVariableK(torch::Tensor a,
   c10::BFloat16* c_ptr = c.data_ptr<c10::BFloat16>();
   for (int i = 0; i < bs; ++i) {
     int64_t k = batch_sizes.data_ptr<int64_t>()[i];
-    CublasGemm(a_ptr, k, m, /*trans_a=*/true,
+    CublasGemm_1(a_ptr, k, m, /*trans_a=*/true,
 	       b_ptr, k, n, /*trans_b=*/false,
 	       c_ptr, m, n);
     a_ptr += k * m;
@@ -434,7 +434,7 @@ void CublasGroupedGemmVariableK(torch::Tensor a,
   }
 }
 
-void GroupedGemmVariableK(torch::Tensor a,
+void GroupedGemmVariableK_1(torch::Tensor a,
 			  torch::Tensor b,
 			  torch::Tensor c,
 			  torch::Tensor batch_sizes) {
@@ -460,7 +460,7 @@ void GroupedGemmVariableK(torch::Tensor a,
   TORCH_CHECK(c.size(2) == n);
 
   // Run the computation.
-  CublasGroupedGemmVariableK(a, b, c, batch_sizes);
+  CublasGroupedGemmVariableK_1(a, b, c, batch_sizes);
 }
 
 // NOTE: We only support dynamic group sizes for the 'a' tensor. Tensor 'b' is
@@ -495,7 +495,7 @@ void GroupedGemm_cuBLAS(torch::Tensor a,
   if (trans_a) {
     // If we can't use CUTLASS for the transposed cases, defer to the variable 'k' helper using cuBLAS
     // for the rest of the op.
-    GroupedGemmVariableK(a, b, c, batch_sizes);
+    GroupedGemmVariableK_1(a, b, c, batch_sizes);
     return;
   }
 #endif
@@ -540,7 +540,7 @@ void GroupedGemm_cuBLAS(torch::Tensor a,
   TORCH_CHECK(c.is_contiguous());
 
 #if !defined(GROUPED_GEMM_CUTLASS)
-  CublasGroupedGemm(a, b, c, batch_sizes, trans_b);
+  CublasGroupedGemm_1(a, b, c, batch_sizes, trans_b);
   return;
 #else
   // The `coord_template` argument contains `kDynamicDim` as one of its dimensions
@@ -551,14 +551,14 @@ void GroupedGemm_cuBLAS(torch::Tensor a,
     ? cutlass::gemm::GemmCoord(hidden_in, hidden_out, kDynamicDim)
     : cutlass::gemm::GemmCoord(kDynamicDim, hidden_out, hidden_in);
   if (trans_a) {
-    CutlassGroupedGemm<true, false>(a, b, c, batch_sizes, coord_template);
+    CutlassGroupedGemm_1<true, false>(a, b, c, batch_sizes, coord_template);
     return;
   }
   if (trans_b) {
-    CutlassGroupedGemm<false, true>(a, b, c, batch_sizes, coord_template);
+    CutlassGroupedGemm_1<false, true>(a, b, c, batch_sizes, coord_template);
     return;
   }
-  CutlassGroupedGemm<false, false>(a, b, c, batch_sizes, coord_template);
+  CutlassGroupedGemm_1<false, false>(a, b, c, batch_sizes, coord_template);
   return;
 #endif
 }

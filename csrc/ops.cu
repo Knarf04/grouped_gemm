@@ -6,10 +6,7 @@ namespace grouped_gemm {
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("gmm_base", &GroupedGemm_base, "Grouped GEMM base.");
-}
-
-PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
-  m.def("gmm_cublas", &GroupedGemm_cuBLAS, "Grouped GEMM cuBLAS.");
+  m.def("gmm_cuBLAS", &GroupedGemm_cuBLAS, "Grouped GEMM cuBLAS.");
 }
 
 }  // namespace grouped_gemm
