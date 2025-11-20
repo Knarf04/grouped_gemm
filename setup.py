@@ -36,7 +36,8 @@ ext_modules = [
         [
             "csrc/ops.cu",
             "csrc/grouped_gemm.cu",
-            "csrc/grouped_gemm_cublas.cu"
+            "csrc/grouped_gemm_cublas.cu",
+            "csrc/grouped_gemm_cutlass.cu"
         ],
         include_dirs = [
             f"{cwd}/third_party/cutlass/include/",

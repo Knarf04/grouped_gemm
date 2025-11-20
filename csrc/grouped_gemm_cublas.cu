@@ -27,9 +27,6 @@ namespace grouped_gemm {
                 "cuBLAS Error: ", static_cast<int>(_status));                    \
   } while (0)
 
-// -----------------------------------------------------------------------------
-// Helper: copy host pointer array to device memory
-// -----------------------------------------------------------------------------
 static torch::Tensor make_device_pointer_array(const std::vector<void*>& host,
                                                const torch::Device& device) {
   auto options = torch::TensorOptions().dtype(torch::kInt64).device(device);
@@ -45,20 +42,6 @@ static torch::Tensor make_device_pointer_array(const std::vector<void*>& host,
   return t;
 }
 
-// -----------------------------------------------------------------------------
-// Fixed-K grouped GEMM (trans_a == false)
-//
-// a : (tokens, hidden_in)  [row-major]
-// b : (num_experts, hidden_in, hidden_out) or
-//     (num_experts, hidden_out, hidden_in) if trans_b == true
-// c : (tokens, hidden_out)
-//
-// batch_sizes : (num_experts,) – number of tokens per expert; sum = tokens
-//
-// We reproduce the original CublasGemm layout trick:
-//   * cuBLAS sees   A = b,  B = a,  C = c
-//   * call uses: C^T = B^T * A^T
-// -----------------------------------------------------------------------------
 static void CublasGroupedGemm_FixedK(torch::Tensor a,
                                      torch::Tensor b,
                                      torch::Tensor c,
@@ -98,7 +81,6 @@ static void CublasGroupedGemm_FixedK(torch::Tensor a,
   TORCH_CHECK(c.size(0) == tokens && c.size(1) == hidden_out,
               "c must have shape (tokens, hidden_out)");
 
-  // Move batch_sizes to host and check total tokens.
   auto batch_sizes_cpu = batch_sizes.to(torch::kCPU);
   const int64_t* bs_ptr = batch_sizes_cpu.data_ptr<int64_t>();
 
@@ -110,38 +92,17 @@ static void CublasGroupedGemm_FixedK(torch::Tensor a,
   TORCH_CHECK(tokens_sum == tokens,
               "Sum of batch_sizes must equal total tokens");
 
-  // GEMM dimensions based on the original CublasGemm:
-  //
-  // CublasGemm(a_rows=m_token, a_cols=k_in, trans_a=false,
-  //            b_rows=b_rows,  b_cols=b_cols, trans_b=trans_b,
-  //            c_rows=m_token, c_cols=hidden_out)
-  //
-  // Inside CublasGemm:
-  //   m_gemm = trans_b ? b_rows : b_cols;
-  //   k_gemm = trans_b ? b_cols : b_rows;
-  //   n_gemm = a_rows;               // because trans_a == false
-  //   lda_val = k_gemm;              // because trans_a == false
-  //   ldb_val = trans_b ? k_gemm : m_gemm;
-  //
-  // cuBLAS call:
-  //   gemmEx(transpose_b, transpose_a,
-  //          m_gemm, n_gemm, k_gemm,
-  //          A = b, lda = ldb_val,
-  //          B = a, ldb = lda_val,
-  //          C, ldc = hidden_out)
-  //
   const int m_gemm = static_cast<int>(trans_b ? b_rows : b_cols);
   const int k_gemm = static_cast<int>(trans_b ? b_cols : b_rows);
 
   TORCH_CHECK(m_gemm > 0 && k_gemm > 0,
               "Invalid GEMM dimensions m or k");
 
-  const bool trans_a = false;  // fixed-K path
-  const int lda_val = k_gemm;  // from CublasGemm logic
+  const bool trans_a = false; 
+  const int lda_val = k_gemm;
   const int ldb_val = trans_b ? k_gemm : m_gemm;
   const int ldc_val = static_cast<int>(hidden_out);
 
-  // Per-group parameters (group_count = num_experts, group_size[i] = 1)
   std::vector<cublasOperation_t> transa_array(num_experts);
   std::vector<cublasOperation_t> transb_array(num_experts);
   std::vector<int> m_array(num_experts);
@@ -155,7 +116,7 @@ static void CublasGroupedGemm_FixedK(torch::Tensor a,
   std::vector<float> beta_array(num_experts, 0.0f);
 
   const cublasOperation_t opA = trans_b ? CUBLAS_OP_T : CUBLAS_OP_N;
-  const cublasOperation_t opB = CUBLAS_OP_N;  // trans_a == false
+  const cublasOperation_t opB = CUBLAS_OP_N;
 
   for (int64_t i = 0; i < num_experts; ++i) {
     const int64_t tokens_i = bs_ptr[i];
@@ -167,15 +128,14 @@ static void CublasGroupedGemm_FixedK(torch::Tensor a,
     m_array[i]      = m_gemm;
     n_array[i]      = static_cast<int>(tokens_i);
     k_array[i]      = k_gemm;
-    lda_array[i]    = ldb_val;   // GEMM's A = b, lda = ldb_val
-    ldb_array[i]    = lda_val;   // GEMM's B = a, ldb = lda_val
-    ldc_array[i]    = ldc_val;   // ldc = hidden_out
+    lda_array[i]    = ldb_val;
+    ldb_array[i]    = lda_val;
+    ldc_array[i]    = ldc_val;
   }
 
-  // Pointer arrays for each problem (one per expert).
-  std::vector<void*> Aarray_host(num_experts);  // points to b (weights)
-  std::vector<void*> Barray_host(num_experts);  // points to a (activations)
-  std::vector<void*> Carray_host(num_experts);  // points to c (output)
+  std::vector<void*> Aarray_host(num_experts);
+  std::vector<void*> Barray_host(num_experts);
+  std::vector<void*> Carray_host(num_experts);
 
   const auto device = a.device();
   const auto* a_ptr_base = a.data_ptr<c10::BFloat16>();
@@ -192,9 +152,9 @@ static void CublasGroupedGemm_FixedK(torch::Tensor a,
     const c10::BFloat16* a_i = a_ptr_base + token_offset * hidden_in;
     c10::BFloat16*       c_i = c_ptr_base + token_offset * hidden_out;
 
-    Aarray_host[i] = const_cast<c10::BFloat16*>(b_i);  // A = b
-    Barray_host[i] = const_cast<c10::BFloat16*>(a_i);  // B = a
-    Carray_host[i] = c_i;                              // C
+    Aarray_host[i] = const_cast<c10::BFloat16*>(b_i);
+    Barray_host[i] = const_cast<c10::BFloat16*>(a_i);
+    Carray_host[i] = c_i;
 
     token_offset += tokens_i;
   }
@@ -202,7 +162,6 @@ static void CublasGroupedGemm_FixedK(torch::Tensor a,
   TORCH_CHECK(token_offset == tokens,
               "Internal error: token_offset mismatch");
 
-  // Copy pointer arrays to device.
   torch::Tensor Aarray_dev = make_device_pointer_array(Aarray_host, device);
   torch::Tensor Barray_dev = make_device_pointer_array(Barray_host, device);
   torch::Tensor Carray_dev = make_device_pointer_array(Carray_host, device);
@@ -245,24 +204,7 @@ static void CublasGroupedGemm_FixedK(torch::Tensor a,
       computeType));
 }
 
-// -----------------------------------------------------------------------------
-// Variable-K grouped GEMM (trans_a == true in GroupedGemm_base)
-//
-// a : concatenation of [k_i, m] blocks (2D)
-// b : concatenation of [k_i, n] blocks (2D)
-// c : (num_experts, m, n)
-//
-// batch_sizes : (num_experts,) – each entry is k_i
-//
-// Original per-problem call was:
-//
-//   CublasGemm(a_i, k_i, m, trans_a=true,
-//              b_i, k_i, n, trans_b=false,
-//              c_i, m, n);
-//
-// We reproduce the same GEMM configuration via cublasGemmGroupedBatchedEx.
-// -----------------------------------------------------------------------------
-void GroupedGemmVariableK_cuBLAS(torch::Tensor a,
+void CublasGroupedGemm_VariableK(torch::Tensor a,
                           torch::Tensor b,
                           torch::Tensor c,
                           torch::Tensor batch_sizes) {
@@ -292,11 +234,9 @@ void GroupedGemmVariableK_cuBLAS(torch::Tensor a,
               c.size(2) == n,
               "c must have shape (num_experts, m, n)");
 
-  // Move batch_sizes to host.
   auto batch_sizes_cpu = batch_sizes.to(torch::kCPU);
   const int64_t* k_host = batch_sizes_cpu.data_ptr<int64_t>();
 
-  // Check that total rows in a and b match sum of k_i.
   int64_t sum_k = 0;
   for (int64_t i = 0; i < num_experts; ++i) {
     TORCH_CHECK(k_host[i] >= 0, "batch_sizes must be non-negative");
@@ -307,26 +247,12 @@ void GroupedGemmVariableK_cuBLAS(torch::Tensor a,
   TORCH_CHECK(b.size(0) == sum_k,
               "b.size(0) must equal sum of batch_sizes");
 
-  // GEMM dimensions from original CublasGemm for variable-K:
-  //
-  //   a_rows = k_i, a_cols = m, trans_a = true
-  //   b_rows = k_i, b_cols = n, trans_b = false
-  //
-  // Inside CublasGemm:
-  //   m_gemm = n;                // trans_b == false -> m_gemm = b_cols
-  //   k_gemm = k_i;              // b_rows
-  //   n_gemm = m;                // trans_a == true  -> n_gemm = a_cols
-  //
-  //   lda_val = n_gemm (because trans_a == true)
-  //   ldb_val = m_gemm (because trans_b == false)
-  //
   const int m_gemm = static_cast<int>(n);
   const int n_gemm = static_cast<int>(m);
 
   TORCH_CHECK(m_gemm > 0 && n_gemm > 0,
               "Invalid GEMM dimensions m or n");
 
-  // Per-group parameters (group_count = num_experts, group_size[i] = 1)
   std::vector<cublasOperation_t> transa_array(num_experts);
   std::vector<cublasOperation_t> transb_array(num_experts);
   std::vector<int> m_array(num_experts);
@@ -339,12 +265,12 @@ void GroupedGemmVariableK_cuBLAS(torch::Tensor a,
   std::vector<float> alpha_array(num_experts, 1.0f);
   std::vector<float> beta_array(num_experts, 0.0f);
 
-  const cublasOperation_t opA = CUBLAS_OP_N;  // trans_b == false
-  const cublasOperation_t opB = CUBLAS_OP_T;  // trans_a == true
+  const cublasOperation_t opA = CUBLAS_OP_N;
+  const cublasOperation_t opB = CUBLAS_OP_T;
 
-  const int lda_val = n_gemm;  // for B = a
-  const int ldb_val = m_gemm;  // for A = b
-  const int ldc_val = static_cast<int>(n);  // c_cols = n
+  const int lda_val = n_gemm;
+  const int ldb_val = m_gemm;
+  const int ldc_val = static_cast<int>(n);
 
   for (int64_t i = 0; i < num_experts; ++i) {
     TORCH_CHECK(k_host[i] <= std::numeric_limits<int>::max(),
@@ -355,15 +281,14 @@ void GroupedGemmVariableK_cuBLAS(torch::Tensor a,
     m_array[i]      = m_gemm;
     n_array[i]      = n_gemm;
     k_array[i]      = static_cast<int>(k_host[i]);
-    lda_array[i]    = ldb_val;   // GEMM's A = b, lda = ldb_val
-    ldb_array[i]    = lda_val;   // GEMM's B = a, ldb = lda_val
-    ldc_array[i]    = ldc_val;   // ldc = n
+    lda_array[i]    = ldb_val;
+    ldb_array[i]    = lda_val;
+    ldc_array[i]    = ldc_val;
   }
 
-  // Pointer arrays for each problem (one per expert).
-  std::vector<void*> Aarray_host(num_experts);  // points to b_i
-  std::vector<void*> Barray_host(num_experts);  // points to a_i
-  std::vector<void*> Carray_host(num_experts);  // points to c_i
+  std::vector<void*> Aarray_host(num_experts);
+  std::vector<void*> Barray_host(num_experts);
+  std::vector<void*> Carray_host(num_experts);
 
   const auto device = a.device();
   const auto* a_ptr_base = a.data_ptr<c10::BFloat16>();
@@ -373,7 +298,7 @@ void GroupedGemmVariableK_cuBLAS(torch::Tensor a,
   int64_t offset_a = 0;
   int64_t offset_b = 0;
 
-  const int64_t c_stride = m * n;  // per expert
+  const int64_t c_stride = m * n;
 
   for (int64_t i = 0; i < num_experts; ++i) {
     const int64_t k_i = k_host[i];
@@ -382,9 +307,9 @@ void GroupedGemmVariableK_cuBLAS(torch::Tensor a,
     const c10::BFloat16* b_i = b_ptr_base + offset_b;
     c10::BFloat16*       c_i = c_ptr_base + i * c_stride;
 
-    Aarray_host[i] = const_cast<c10::BFloat16*>(b_i);  // A = b_i
-    Barray_host[i] = const_cast<c10::BFloat16*>(a_i);  // B = a_i
-    Carray_host[i] = c_i;                              // C_i
+    Aarray_host[i] = const_cast<c10::BFloat16*>(b_i);
+    Barray_host[i] = const_cast<c10::BFloat16*>(a_i);
+    Carray_host[i] = c_i;
 
     offset_a += k_i * m;
     offset_b += k_i * n;
@@ -395,7 +320,6 @@ void GroupedGemmVariableK_cuBLAS(torch::Tensor a,
   TORCH_CHECK(offset_b == b.size(0) * n,
               "Internal error: offset_b mismatch");
 
-  // Copy pointer arrays to device.
   torch::Tensor Aarray_dev = make_device_pointer_array(Aarray_host, device);
   torch::Tensor Barray_dev = make_device_pointer_array(Barray_host, device);
   torch::Tensor Carray_dev = make_device_pointer_array(Carray_host, device);
@@ -438,9 +362,6 @@ void GroupedGemmVariableK_cuBLAS(torch::Tensor a,
       computeType));
 }
 
-// -----------------------------------------------------------------------------
-// Public entry point used from Python
-// -----------------------------------------------------------------------------
 void GroupedGemm_cuBLAS(torch::Tensor a,
                       torch::Tensor b,
                       torch::Tensor c,
@@ -451,10 +372,8 @@ void GroupedGemm_cuBLAS(torch::Tensor a,
               "Only one of trans_a / trans_b may be true");
 
   if (trans_a) {
-    // Variable-K path (originally delegated to GroupedGemmVariableK_cuBLAS).
-    GroupedGemmVariableK_cuBLAS(a, b, c, batch_sizes);
+    CublasGroupedGemm_VariableK(a, b, c, batch_sizes);
   } else {
-    // Fixed-K grouped GEMM along experts.
     CublasGroupedGemm_FixedK(a, b, c, batch_sizes, trans_b);
   }
 }

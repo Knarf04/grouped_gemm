@@ -68,7 +68,7 @@ class OpsTest(parameterized.TestCase):
         a_ref = a.detach().clone().requires_grad_(True)
         b_ref = b.detach().clone().requires_grad_(True)
 
-        out = ops.gmm_base(a, b, batch_sizes, trans_b)
+        out = ops.gmm_cuBLAS(a, b, batch_sizes, trans_b)
         expected_out = gmm(a_ref, b_ref, batch_sizes, trans_b)
         self.assertTrue(allclose(out, expected_out))
 
@@ -97,7 +97,7 @@ class OpsTest(parameterized.TestCase):
         a_ref = a.detach().clone().requires_grad_(True)
         b_ref = b.detach().clone().requires_grad_(True)
 
-        out = ops.gmm_base(a, b, batch_sizes, trans_b)
+        out = ops.gmm_cuBLAS(a, b, batch_sizes, trans_b)
         expected_out = gmm(a_ref, b_ref, batch_sizes, trans_b)
         self.assertTrue(allclose(out, expected_out))
 
@@ -128,7 +128,7 @@ class EdgeCasesTest(unittest.TestCase):
         a_ref = a.detach().clone().requires_grad_(True)
         b_ref = b.detach().clone().requires_grad_(True)
 
-        out = ops.gmm_base(a, b, batch_sizes)
+        out = ops.gmm_cuBLAS(a, b, batch_sizes)
         expected_out = gmm(a_ref, b_ref, batch_sizes)
         self.assertTrue(allclose(out, expected_out))
 
@@ -149,7 +149,7 @@ class EdgeCasesTest(unittest.TestCase):
         if batch_sizes_on_device:
             batch_sizes = batch_sizes.cuda()
 
-        ops.backend.gmm_base(a, b, batch_sizes, trans_a=True, c=c)
+        ops.backend.gmm_cuBLAS(a, b, batch_sizes, trans_a=True, c=c)
         self.assertTrue((c[0] == 0).all())
         self.assertTrue((c[1] == 128).all())
         self.assertTrue((c[2] == 0).all())
