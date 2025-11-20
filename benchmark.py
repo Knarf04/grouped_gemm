@@ -27,7 +27,7 @@ def benchmark(name, func, x, w, batch_sizes, iterations=50):
     
     print(f"  -> Total GPU time: {total_ms:.2f} ms")
     print(f"  -> Time per step:  {avg_ms:.3f} ms")
-    prof.export_chrome_trace(f'{name}_trace.json')
+    prof.export_chrome_trace(f'traces/{name}_trace.json')
     return avg_ms
 
 if __name__ == '__main__':
