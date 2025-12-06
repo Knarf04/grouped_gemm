@@ -84,15 +84,15 @@ using OperatorClass = cutlass::arch::OpClassTensorOp;
 struct CooperativeConfig {
   using KernelSchedule   = cutlass::gemm::KernelPtrArrayTmaWarpSpecializedCooperative;
   using EpilogueSchedule = cutlass::epilogue::PtrArrayTmaWarpSpecializedCooperative;
-  using TileShape        = Shape<_256,_128,_128>;
+  using TileShape        = Shape<_128,_256,_64>;
   using ClusterShape     = Shape<_1,_2,_1>;
 };
 
 struct PingpongConfig {
   using KernelSchedule   = cutlass::gemm::KernelPtrArrayTmaWarpSpecializedPingpong;
   using EpilogueSchedule = cutlass::epilogue::PtrArrayTmaWarpSpecializedPingpong;
-  using TileShape        = Shape<_128,_128,_128>;
-  using ClusterShape     = Shape<_2,_1,_1>;
+  using TileShape        = Shape<_64,_256,_64>;
+  using ClusterShape     = Shape<_1,_2,_1>;
 };
 
 template <typename ScheduleConfig, bool TransA, bool TransB>
