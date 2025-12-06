@@ -15,6 +15,8 @@ if os.environ.get("TORCH_CUDA_ARCH_LIST"):
 else:
     device_capability = torch.cuda.get_device_capability()
     device_capability = f"{device_capability[0]}{device_capability[1]}"
+    if device_capability == "90":
+        device_capability = f"{device_capability}a"
 
 cwd = Path(os.path.dirname(os.path.abspath(__file__)))
 
@@ -37,10 +39,12 @@ ext_modules = [
             "csrc/ops.cu",
             "csrc/grouped_gemm.cu",
             "csrc/grouped_gemm_cublas.cu",
-            "csrc/grouped_gemm_cutlass_sm80.cu"
+            "csrc/grouped_gemm_cutlass_sm80.cu",
+            "csrc/grouped_gemm_cutlass_sm90.cu"
         ],
         include_dirs = [
             f"{cwd}/third_party/cutlass/include/",
+            f"{cwd}/third_party/cutlass/tools/util/include/",
             f"{cwd}/csrc"
         ],
         extra_compile_args={

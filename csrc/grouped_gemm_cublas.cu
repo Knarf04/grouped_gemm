@@ -1,4 +1,4 @@
-#include "grouped_gemm.h"
+#include "grouped_gemm_cublas.h"
 
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAStream.h>

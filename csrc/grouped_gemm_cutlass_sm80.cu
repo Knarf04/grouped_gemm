@@ -1,4 +1,4 @@
-#include "grouped_gemm.h"
+#include "grouped_gemm_cutlass_sm80.h"
 #include "fill_arguments.cuh"
 
 #include <ATen/cuda/CUDAContext.h>

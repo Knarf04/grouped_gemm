@@ -124,7 +124,7 @@ if __name__ == '__main__':
     
     model_name = "Qwen/Qwen3-30B-A3B"
     model_config = model_config_dict[model_name]
-    seqlen = 4096
+    seqlen = 8192
     test_case = "up_proj"
 
     M = seqlen * model_config["num_experts_per_tok"]
@@ -160,7 +160,7 @@ if __name__ == '__main__':
         x.grad = None
         w.grad = None
 
-        time_base, tflops_cublas = benchmark(
+        time_base, tflops_base = benchmark(
             "cuBLAS (Base)", 
             gg.ops.gmm_base, 
             x, w, batch_sizes
@@ -176,12 +176,28 @@ if __name__ == '__main__':
 
         print("-" * 30)
 
-        time_cublas, tflops_cublas = benchmark(
+        time_CUTLASS, tflops_CUTLASS = benchmark(
             "CUTLASS sm80", 
             gg.ops.gmm_CUTLASS_sm80, 
             x, w, batch_sizes
         )
 
+        print("-" * 30)
+
+        time_CUTLASS_sm90_cooperative, tflops_CUTLASS_sm90_cooperative = benchmark(
+            "CUTLASS sm90 cooperative", 
+            gg.ops.gmm_CUTLASS_sm90_cooperative, 
+            x, w, batch_sizes
+        )
+
+        print("-" * 30)
+
+        time_CUTLASS_sm90_pingpong, tflops_CUTLASS_sm90_pingpong = benchmark(
+            "CUTLASS sm90 pingpong", 
+            gg.ops.gmm_CUTLASS_sm90_pingpong, 
+            x, w, batch_sizes
+        )
+
         print("=" * 30)
-        print(f"Speedup: {time_base / time_cublas:.2f}x")
-        print("=" * 30)
+        # print(f"Speedup: {time_base / time_cublas:.2f}x")
+        # print("=" * 30)

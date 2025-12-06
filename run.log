@@ -1,0 +1,106 @@
+Config: up_proj | Tokens: 65536 | Experts: 128 | Shape: K=2048, N=1536
+
+==============================
+Workload mode: uniform
+Statistics: min=512, max=512, mean=512.0, var=0.0
+==============================
+Profiling cuBLAS (Base)...
+  -> Total GPU time: 158.46 ms
+  -> Time per step:  3.169 ms
+  -> Forward TFLOPs: 130.10
+  -> Fwd+Bwd TFLOPs (est): 390.29
+------------------------------
+Profiling cuBLAS (Batched)...
+  -> Total GPU time: 249.24 ms
+  -> Time per step:  4.985 ms
+  -> Forward TFLOPs: 82.71
+  -> Fwd+Bwd TFLOPs (est): 248.14
+------------------------------
+Profiling CUTLASS sm80...
+  -> Total GPU time: 177.97 ms
+  -> Time per step:  3.559 ms
+  -> Forward TFLOPs: 115.84
+  -> Fwd+Bwd TFLOPs (est): 347.51
+------------------------------
+Profiling CUTLASS sm90 cooperative...
+  -> Total GPU time: 170.06 ms
+  -> Time per step:  3.401 ms
+  -> Forward TFLOPs: 121.22
+  -> Fwd+Bwd TFLOPs (est): 363.67
+------------------------------
+Profiling CUTLASS sm90 pingpong...
+  -> Total GPU time: 164.07 ms
+  -> Time per step:  3.281 ms
+  -> Forward TFLOPs: 125.65
+  -> Fwd+Bwd TFLOPs (est): 376.96
+==============================
+
+==============================
+Workload mode: mild_skew
+Statistics: min=69, max=1892, mean=512.0, var=109840.2
+==============================
+Profiling cuBLAS (Base)...
+  -> Total GPU time: 174.91 ms
+  -> Time per step:  3.498 ms
+  -> Forward TFLOPs: 117.87
+  -> Fwd+Bwd TFLOPs (est): 353.60
+------------------------------
+Profiling cuBLAS (Batched)...
+  -> Total GPU time: 216.87 ms
+  -> Time per step:  4.337 ms
+  -> Forward TFLOPs: 95.06
+  -> Fwd+Bwd TFLOPs (est): 285.18
+------------------------------
+Profiling CUTLASS sm80...
+  -> Total GPU time: 189.15 ms
+  -> Time per step:  3.783 ms
+  -> Forward TFLOPs: 108.99
+  -> Fwd+Bwd TFLOPs (est): 326.98
+------------------------------
+Profiling CUTLASS sm90 cooperative...
+  -> Total GPU time: 193.93 ms
+  -> Time per step:  3.879 ms
+  -> Forward TFLOPs: 106.31
+  -> Fwd+Bwd TFLOPs (est): 318.92
+------------------------------
+Profiling CUTLASS sm90 pingpong...
+  -> Total GPU time: 189.44 ms
+  -> Time per step:  3.789 ms
+  -> Forward TFLOPs: 108.83
+  -> Fwd+Bwd TFLOPs (est): 326.48
+==============================
+
+==============================
+Workload mode: extreme_skew
+Statistics: min=117, max=3277, mean=512.0, var=1091533.4
+==============================
+Profiling cuBLAS (Base)...
+  -> Total GPU time: 183.57 ms
+  -> Time per step:  3.671 ms
+  -> Forward TFLOPs: 112.30
+  -> Fwd+Bwd TFLOPs (est): 336.91
+------------------------------
+Profiling cuBLAS (Batched)...
+  -> Total GPU time: 212.72 ms
+  -> Time per step:  4.254 ms
+  -> Forward TFLOPs: 96.91
+  -> Fwd+Bwd TFLOPs (est): 290.74
+------------------------------
+Profiling CUTLASS sm80...
+  -> Total GPU time: 185.34 ms
+  -> Time per step:  3.707 ms
+  -> Forward TFLOPs: 111.23
+  -> Fwd+Bwd TFLOPs (est): 333.70
+------------------------------
+Profiling CUTLASS sm90 cooperative...
+  -> Total GPU time: 193.37 ms
+  -> Time per step:  3.867 ms
+  -> Forward TFLOPs: 106.61
+  -> Fwd+Bwd TFLOPs (est): 319.84
+------------------------------
+Profiling CUTLASS sm90 pingpong...
+  -> Total GPU time: 196.13 ms
+  -> Time per step:  3.923 ms
+  -> Forward TFLOPs: 105.11
+  -> Fwd+Bwd TFLOPs (est): 315.34
+==============================
